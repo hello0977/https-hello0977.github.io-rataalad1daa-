@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Riddler Terminal</title>
+<style>
+body {
+  background: black;
+  color: #00ff00;
+  font-family: monospace;
+  margin: 0;
+  padding: 20px;
+}
+#screen {
+  white-space: pre-wrap;
+  font-size: 18px;
+  line-height: 1.6;
+}
+input {
+  background: black;
+  border: none;
+  color: #00ff00;
+  font-family: monospace;
+  font-size: 18px;
+  outline: none;
+  display: none;
+}
+button {
+  background: black;
+  color: #00ff00;
+  border: 1px solid #00ff00;
+  font-family: monospace;
+  font-size: 18px;
+  padding: 5px 10px;
+  margin: 5px 5px 0 0;
+  cursor: pointer;
+}
+a {
+  color: #00ff00;
+}
+</style>
+</head>
+<body>
+
+<div id="screen"></div>
+<input type="text" id="userInput" autocomplete="off"/>
+<div id="buttonContainer"></div>
+
+<script>
+const screen = document.getElementById("screen");
+const input = document.getElementById("userInput");
+const buttonContainer = document.getElementById("buttonContainer");
+
+let stage = "intro";
+let playerName = "";
+const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+// 랜덤 코드 출력
+function randomLine(length) {
+  let line = "";
+  for (let i = 0; i < length; i++) {
+    line += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return line;
+}
+
+// 빠른 타자
+function fastType(text, callback) {
+  let i = 0;
+  function type() {
+    if (i < text.length) {
+      screen.innerHTML += text[i];
+      i++;
+      setTimeout(type, 2);
+    } else {
+      screen.innerHTML += "\n";
+      if (callback) callback();
+    }
+  }
+  type();
+}
+
+// 느린 타자
+function slowType(text, speed = 100, callback) {
+  let i = 0;
+  function type() {
+    if (i < text.length) {
+      screen.innerHTML += text[i];
+      i++;
+      setTimeout(type, speed);
+    } else {
+      screen.innerHTML += "\n\n";
+      if (callback) callback();
+    }
+  }
+  type();
+}
+
+// 여러 랜덤 코드 줄
+function generateLines(lines = 6, callback) {
+  let currentLine = 0;
+  function nextLine() {
+    if (currentLine < lines) {
+      fastType(randomLine(50), () => {
+        currentLine++;
+        nextLine();
+      });
+    } else {
+      callback();
+    }
+  }
+  nextLine();
+}
+
+// 한글 체크
+function isKorean(text) {
+  return /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(text);
+}
+
+// 이름 추출
+function extractName(text) {
+  text = text.trim().replace(/[.,!?]$/, "");
+  let lower = text.toLowerCase();
+  if (lower.startsWith("my name is ")) return text.substring(11).trim();
+  if (lower.startsWith("i am ")) return text.substring(5).trim();
+  if (lower.startsWith("i'm ")) return text.substring(4).trim();
+  if (lower.startsWith("im ")) return text.substring(3).trim();
+  if (lower.startsWith("내 이름은 ")) return text.substring(6).trim();
+  if (!text.includes(" ") && text.length >= 2 && text.length <= 15) return text;
+  return null;
+}
+
+// 시작
+generateLines(6, () => {
+  screen.innerHTML = "";
+  slowType("who are you?", 120, () => {
+    input.style.display = "block";
+    input.focus();
+    stage = "identity";
+  });
+});
+
+// 버튼 생성 함수
+function showButtons(buttons) {
+  buttonContainer.innerHTML = "";
+  buttons.forEach(btn => {
+    const b = document.createElement("button");
+    b.textContent = btn.text;
+    b.onclick = () => {
+      buttonContainer.innerHTML = ""; // 클릭 시 버튼 삭제
+      btn.action();
+    };
+    buttonContainer.appendChild(b);
+  });
+}
+
+// 퍼즐 시작 함수
+function startFirstPuzzle() {
+  stage = "firstPuzzle";
+  slowType("Who keeps order in the streets and upholds the law?", 120, () => {
+    input.style.display = "block";
+    input.focus();
+  });
+}
+
+function startSecondPuzzle() {
+  stage = "secondPuzzle";
+  slowType("What spreads quietly through governments and organizations, destroying trust and fairness?", 120, () => {
+    input.style.display = "block";
+    input.focus();
+  });
+}
+
+// 입력 이벤트
+input.addEventListener("keydown", function(e) {
+  if (e.key === "Enter") {
+    const text = input.value.trim();
+    screen.innerHTML += "> " + text + "\n\n";
+    input.value = "";
+
+    if (isKorean(text)) {
+      slowType("Speak English.", 90);
+      return;
+    }
+
+    // 이름 입력 단계
+    if (stage === "identity" || stage === "askName") {
+      if (text.toLowerCase().includes("who are you")) {
+        slowType("I am Riddler.", 100, () => {
+          slowType("What is your name?", 100);
+          stage = "askName";
+        });
+        return;
+      }
+      let name = extractName(text);
+      if (name) {
+        playerName = name;
+        setTimeout(() => {
+          slowType(`Hello, ${playerName}.`, 120, () => {
+            slowType("I am Riddler.", 120, () => {
+              slowType("Nice to meet you.", 120, () => {
+                slowType("Do you like puzzles?", 120, () => {
+                  showButtons([
+                    {text: "Yes", action: () => {
+                      slowType("Can I give you a puzzle?", 120, () => {
+                        showButtons([{text: "Yes", action: startFirstPuzzle}]);
+                      });
+                    }},
+                    {text: "No", action: () => {
+                      slowType("Alright, goodbye.", 120);
+                    }}
+                  ]);
+                  stage = "puzzlePrompt";
+                });
+              });
+            });
+          });
+        }, 400);
+        return;
+      }
+    }
+
+    // 퍼즐 1 단계
+    if (stage === "firstPuzzle") {
+      const ans = text.toLowerCase();
+      if (ans.includes("police") || ans.includes("cop")) {
+        slowType("Correct! I'll give you one more puzzle. If you get it right, you'll get a reward.", 120, startSecondPuzzle);
+      } else if (ans === "i don't know" || ans === "idk" || ans === "모르겠다") {
+        slowType("Think carefully.", 120);
+      } else {
+        slowType("Try again.", 120);
+      }
+    }
+
+    // 퍼즐 2 단계
+    if (stage === "secondPuzzle") {
+      const ans = text.toLowerCase();
+      if (ans.includes("corruption")) {
+        slowType("Correct! Here's your reward:", 120, () => {
+          slowType("Most South Korean police are under someone’s control.", 120, () => {
+            screen.innerHTML += "\n<a href='https://www.youtube.com/watch?v=gsyeFhXVNPM' target='_blank'>Watch the video</a>\n";
+          });
+        });
+      } else if (ans === "i don't know" || ans === "idk" || ans === "모르겠다") {
+        slowType("Think carefully.", 120);
+      } else {
+        slowType("Try again.", 120);
+      }
+    }
+  }
+});
+</script>
+
+</body>
+</html>
